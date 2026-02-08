@@ -13,7 +13,7 @@ import { Button } from "./ui/button";
 import {
   deleteJobApplication,
   updateJobApplication,
-} from "@/lib/actions/job-applications";
+} from "@/lib/actions/tasks";
 import {
   Dialog,
   DialogContent,

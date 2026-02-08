@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Board, Column, JobApplication } from "../models/models.types";
-import { updateJobApplication } from "../actions/job-applications";
+import { Board, Column, Task } from "../models/models.types";
+import { updateTask } from "../actions/tasks";
 
 export function useBoard(initialBoard?: Board | null) {
   const [board, setBoard] = useState<Board | null>(initialBoard || null);
@@ -16,59 +16,48 @@ export function useBoard(initialBoard?: Board | null) {
     }
   }, [initialBoard]);
 
-  async function moveJob(
-    jobApplicationId: string,
-    newColumnId: string,
-    newOrder: number
-  ) {
+  async function moveTaskClient(taskId: string, newColumnId: string, newOrder: number) {
+    // optimistic update
     setColumns((prev) => {
       const newColumns = prev.map((col) => ({
         ...col,
-        jobApplications: [...col.jobApplications],
+        tasks: [...(col.tasks || [])],
       }));
 
-      // Find and remove job from the old column
-
-      let jobToMove: JobApplication | null = null;
+      let taskToMove: Task | null = null;
       let oldColumnId: string | null = null;
 
       for (const col of newColumns) {
-        const jobIndex = col.jobApplications.findIndex(
-          (j) => j._id === jobApplicationId
-        );
-        if (jobIndex !== -1 && jobIndex !== undefined) {
-          jobToMove = col.jobApplications[jobIndex];
+        const idx = (col.tasks || []).findIndex((t) => t._id === taskId);
+        if (idx !== -1) {
+          taskToMove = col.tasks![idx];
           oldColumnId = col._id;
-          col.jobApplications = col.jobApplications.filter(
-            (job) => job._id !== jobApplicationId
-          );
+          col.tasks = col.tasks!.filter((t) => t._id !== taskId);
           break;
         }
       }
 
-      if (jobToMove && oldColumnId) {
-        const targetColumnIndex = newColumns.findIndex(
-          (col) => col._id === newColumnId
-        );
-        if (targetColumnIndex !== -1) {
-          const targetColumn = newColumns[targetColumnIndex];
-          const currentJobs = targetColumn.jobApplications || [];
+      if (taskToMove && oldColumnId) {
+        const targetIdx = newColumns.findIndex((c) => c._id === newColumnId);
+        if (targetIdx !== -1) {
+          const target = newColumns[targetIdx];
+          const current = target.tasks || [];
 
-          const updatedJobs = [...currentJobs];
-          updatedJobs.splice(newOrder, 0, {
-            ...jobToMove,
+          const updated = [...current];
+          updated.splice(newOrder, 0, {
+            ...taskToMove,
             columnId: newColumnId,
             order: newOrder * 100,
           });
 
-          const jobsWithUpdatedOrders = updatedJobs.map((job, idx) => ({
-            ...job,
+          const withOrders = updated.map((t, idx) => ({
+            ...t,
             order: idx * 100,
           }));
 
-          newColumns[targetColumnIndex] = {
-            ...targetColumn,
-            jobApplications: jobsWithUpdatedOrders,
+          newColumns[targetIdx] = {
+            ...target,
+            tasks: withOrders,
           };
         }
       }
@@ -77,14 +66,12 @@ export function useBoard(initialBoard?: Board | null) {
     });
 
     try {
-      const result = await updateJobApplication(jobApplicationId, {
-        columnId: newColumnId,
-        order: newOrder,
-      });
+      await updateTask(taskId, { columnId: newColumnId, order: newOrder });
     } catch (err) {
-      console.error("Error", err);
+      console.error("Error moving task", err);
+      setError(err instanceof Error ? err.message : "Failed to move task");
     }
   }
 
-  return { board, columns, error, moveJob };
+  return { board, columns, error, moveTask: moveTaskClient };
 }

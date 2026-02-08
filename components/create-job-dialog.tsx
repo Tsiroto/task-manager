@@ -1,192 +1,192 @@
 "use client";
 
-import { Plus } from "lucide-react";
+import * as React from "react";
 import { Button } from "./ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "./ui/dialog";
-import { Label } from "./ui/label";
 import { Input } from "./ui/input";
+import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
-import React, { useState } from "react";
-import { createJobApplication } from "@/lib/actions/job-applications";
+import { createTask } from "@/lib/actions/tasks";
 
-interface CreateJobApplicationDialogProps {
-  columnId: string;
+type Props = {
   boardId: string;
-}
-
-const INITIAL_FORM_DATA = {
-  company: "",
-  position: "",
-  location: "",
-  notes: "",
-  salary: "",
-  jobUrl: "",
-  tags: "",
-  description: "",
+  columnId: string;
+  onCreated?: () => void;
+  triggerLabel?: string; // optional override
 };
 
-export default function CreateJobApplicationDialog({
-  columnId,
+export default function CreateJobDialog({
   boardId,
-}: CreateJobApplicationDialogProps) {
-  const [open, setOpen] = useState<boolean>(false);
-  const [formData, setFormData] = useState(INITIAL_FORM_DATA);
+  columnId,
+  onCreated,
+  triggerLabel = "+ Task",
+}: Props) {
+  const [open, setOpen] = React.useState(false);
+  const [loading, setLoading] = React.useState(false);
 
-  async function handleSubmit(e: React.FormEvent) {
+  const [title, setTitle] = React.useState("");
+  const [subtitle, setSubtitle] = React.useState("");
+  const [link, setLink] = React.useState("");
+  const [labels, setLabels] = React.useState(""); // comma-separated
+  const [priority, setPriority] = React.useState<"low" | "medium" | "high" | "">("");
+  const [dueDate, setDueDate] = React.useState("");
+  const [description, setDescription] = React.useState("");
+
+  function reset() {
+    setTitle("");
+    setSubtitle("");
+    setLink("");
+    setLabels("");
+    setPriority("");
+    setDueDate("");
+    setDescription("");
+  }
+
+  async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!title.trim()) return;
 
+    setLoading(true);
     try {
-      const result = await createJobApplication({
-        ...formData,
-        columnId,
+      await createTask({
         boardId,
-        tags: formData.tags
-          .split(",")
-          .map((tag) => tag.trim())
-          .filter((tag) => tag.length > 0),
+        columnId,
+        title: title.trim(),
+        subtitle: subtitle.trim() || undefined,
+        link: link.trim() || undefined,
+        labels,
+        priority: priority || undefined,
+        dueDate: dueDate || undefined,
+        description: description.trim() || undefined,
       });
-
-      if (!result.error) {
-        setFormData(INITIAL_FORM_DATA);
-        setOpen(false);
-      } else {
-        console.error("Failed to create job: ", result.error);
-      }
+      setOpen(false);
+      reset();
+      onCreated?.();
     } catch (err) {
       console.error(err);
+      // keep it simple: you can wire toast here later
+      alert(err instanceof Error ? err.message : "Failed to create task");
+    } finally {
+      setLoading(false);
     }
   }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger>
-        <Button
-          variant="outline"
-          className="w-full mb-4 justify-start text-muted-foreground border-dashed border-2 hover:border-solid hover:bg-muted/50"
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          Add Job
+      <DialogTrigger asChild>
+        <Button type="button" variant="ghost">
+          {triggerLabel}
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-2xl">
+
+      <DialogContent className="sm:max-w-[560px]">
         <DialogHeader>
-          <DialogTitle>Add Job Application</DialogTitle>
-          <DialogDescription>Track a new job application</DialogDescription>
+          <DialogTitle>Create Task</DialogTitle>
         </DialogHeader>
-        <form className="space-y-4" onSubmit={handleSubmit}>
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="company">Company *</Label>
-                <Input
-                  id="company"
-                  required
-                  value={formData.company}
-                  onChange={(e) =>
-                    setFormData({ ...formData, company: e.target.value })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="position">Position *</Label>
-                <Input
-                  id="position"
-                  required
-                  value={formData.position}
-                  onChange={(e) =>
-                    setFormData({ ...formData, position: e.target.value })
-                  }
-                />
-              </div>
+
+        <form onSubmit={onSubmit} className="space-y-4">
+          <div className="grid gap-2">
+            <Label htmlFor="task-title">Title *</Label>
+            <Input
+              id="task-title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="e.g. Write onboarding doc"
+              autoFocus
+              required
+            />
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="task-subtitle">Subtitle</Label>
+            <Input
+              id="task-subtitle"
+              value={subtitle}
+              onChange={(e) => setSubtitle(e.target.value)}
+              placeholder="Optional short context"
+            />
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="task-link">Link</Label>
+            <Input
+              id="task-link"
+              value={link}
+              onChange={(e) => setLink(e.target.value)}
+              placeholder="https://…"
+            />
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="task-labels">Labels (comma separated)</Label>
+            <Input
+              id="task-labels"
+              value={labels}
+              onChange={(e) => setLabels(e.target.value)}
+              placeholder="design, urgent, bug"
+            />
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-2">
+              <Label htmlFor="task-priority">Priority</Label>
+              <select
+                id="task-priority"
+                className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+                value={priority}
+                onChange={(e) => setPriority(e.target.value as any)}
+              >
+                <option value="">None</option>
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+              </select>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="location">Location</Label>
-                <Input
-                  id="location"
-                  value={formData.location}
-                  onChange={(e) =>
-                    setFormData({ ...formData, location: e.target.value })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="salary">Salary</Label>
-                <Input
-                  id="salary"
-                  placeholder="e.g., $100k - $150k"
-                  value={formData.salary}
-                  onChange={(e) =>
-                    setFormData({ ...formData, salary: e.target.value })
-                  }
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="jobUrl">Job URL</Label>
+
+            <div className="grid gap-2">
+              <Label htmlFor="task-dueDate">Due date</Label>
               <Input
-                id="jobUrl"
-                type="url"
-                placeholder="https://..."
-                value={formData.jobUrl}
-                onChange={(e) =>
-                  setFormData({ ...formData, jobUrl: e.target.value })
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="tags">Tags (comma-separated)</Label>
-              <Input
-                id="tags"
-                placeholder="React, Tailwind, High Pay"
-                value={formData.tags}
-                onChange={(e) =>
-                  setFormData({ ...formData, tags: e.target.value })
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                rows={3}
-                placeholder="Brief description of the role..."
-                value={formData.description}
-                onChange={(e) =>
-                  setFormData({ ...formData, description: e.target.value })
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="notes">Notes</Label>
-              <Textarea
-                id="notes"
-                rows={4}
-                value={formData.notes}
-                onChange={(e) =>
-                  setFormData({ ...formData, notes: e.target.value })
-                }
+                id="task-dueDate"
+                type="date"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
               />
             </div>
           </div>
 
-          <DialogFooter>
+          <div className="grid gap-2">
+            <Label htmlFor="task-description">Description</Label>
+            <Textarea
+              id="task-description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Notes, acceptance criteria, next steps…"
+              rows={5}
+            />
+          </div>
+
+          <DialogFooter className="gap-2">
             <Button
               type="button"
-              variant="outline"
-              onClick={() => setOpen(false)}
+              variant="ghost"
+              onClick={() => {
+                setOpen(false);
+                reset();
+              }}
+              disabled={loading}
             >
               Cancel
             </Button>
-            <Button type="submit">Add Application</Button>
+            <Button type="submit" disabled={loading || !title.trim()}>
+              {loading ? "Creating…" : "Create"}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

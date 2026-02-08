@@ -1,23 +1,21 @@
-export interface JobApplication {
+export interface Task {
   _id: string;
-  company: string;
-  position: string;
-  location?: string;
-  status: string;
-  notes?: string;
-  salary?: string;
-  jobUrl?: string;
+  title: string;
+  subtitle?: string;
+  link?: string;
   order: number;
   columnId?: string;
-  tags?: string[];
+  labels?: string[];
   description?: string;
+  dueDate?: string;
+  priority?: "low" | "medium" | "high";
 }
 
 export interface Column {
   _id: string;
   name: string;
   order: number;
-  jobApplications: JobApplication[];
+  tasks: Task[];
 }
 
 export interface Board {

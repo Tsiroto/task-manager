@@ -25,7 +25,7 @@ export default function Navbar() {
           className="flex items-center gap-2 text-xl font-semibold text-primary"
         >
           <Briefcase />
-          Task Tracker
+          Task Manager
         </Link>
         <div className="flex items-center gap-4">
           {session?.user ? (
@@ -36,6 +36,14 @@ export default function Navbar() {
                   className="text-gray-700 hover:text-red-600 cursor-pointer"
                 >
                   Dashboard
+                </Button>
+              </Link>
+              <Link href="/users">
+                <Button
+                  variant="ghost"
+                  className="text-gray-700 hover:text-red-600 cursor-pointer"
+                >
+                  Users
                 </Button>
               </Link>
               <DropdownMenu>

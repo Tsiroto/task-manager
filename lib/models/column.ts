@@ -4,40 +4,21 @@ export interface IColumn extends Document {
   name: string;
   boardId: mongoose.Types.ObjectId;
   order: number;
-  jobApplications: mongoose.Types.ObjectId[];
+  tasks: mongoose.Types.ObjectId[];
   createdAt: Date;
   updatedAt: Date;
 }
 
-// Board -> Columns -> JobApplications
+// Board -> Columns -> Tasks
 
 const ColumnSchema = new Schema<IColumn>(
   {
-    name: {
-      type: String,
-      required: true,
-    },
-    boardId: {
-      type: Schema.Types.ObjectId,
-      ref: "Board",
-      required: true,
-      index: true,
-    },
-    order: {
-      type: Number,
-      required: true,
-      default: 0,
-    },
-    jobApplications: [
-      {
-        type: Schema.Types.ObjectId,
-        ref: "JobApplication",
-      },
-    ],
+    name: { type: String, required: true },
+    boardId: { type: Schema.Types.ObjectId, ref: "Board", required: true, index: true },
+    order: { type: Number, required: true, default: 0 },
+    tasks: [{ type: Schema.Types.ObjectId, ref: "Task" }],
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true }
 );
 
 export default mongoose.models.Column ||

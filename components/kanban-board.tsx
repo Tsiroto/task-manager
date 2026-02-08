@@ -1,344 +1,225 @@
 "use client";
 
-import { Board, Column, JobApplication } from "@/lib/models/models.types";
-import {
-  Award,
-  Calendar,
-  CheckCircle2,
-  Mic,
-  MoreHorizontal,
-  MoreVertical,
-  Trash2,
-  XCircle,
-} from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "./ui/dropdown-menu";
+import * as React from "react";
+import CreateJobDialog from "./create-job-dialog";
+import { Card, CardContent } from "./ui/card";
 import { Button } from "./ui/button";
-import CreateJobApplicationDialog from "./create-job-dialog";
-import JobApplicationCard from "./job-application-card";
-import { useBoard } from "@/lib/hooks/useBoards";
-import {
-  closestCorners,
-  DndContext,
-  DragEndEvent,
-  DragOverlay,
-  DragStartEvent,
-  PointerSensor,
-  useDroppable,
-  useSensor,
-  useSensors,
-} from "@dnd-kit/core";
-import {
-  SortableContext,
-  useSortable,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
-import { useState } from "react";
+import { deleteTask, updateTask } from "@/lib/actions/tasks";
 
-interface KanbanBoardProps {
-  board: Board;
-  userId: string;
-}
+type Task = {
+  _id: string;
+  title: string;
+  subtitle?: string;
+  link?: string;
+  labels?: string[];
+  description?: string;
+  dueDate?: string | Date;
+  priority?: "low" | "medium" | "high";
+  order: number;
+  columnId: string;
+};
 
-interface ColConfig {
-  color: string;
-  icon: React.ReactNode;
-}
-const COLUMN_CONFIG: Array<ColConfig> = [
-  {
-    color: "bg-cyan-500",
-    icon: <Calendar className="h-4 w-4" />,
-  },
-  {
-    color: "bg-purple-500",
-    icon: <CheckCircle2 className="h-4 w-4" />,
-  },
-  {
-    color: "bg-green-500",
-    icon: <Mic className="h-4 w-4" />,
-  },
-  {
-    color: "bg-yellow-500",
-    icon: <Award className="h-4 w-4" />,
-  },
-  {
-    color: "bg-red-500",
-    icon: <XCircle className="h-4 w-4" />,
-  },
-];
+type Column = {
+  _id: string;
+  name: string;
+  order: number;
+  tasks: Task[];
+};
 
-function DroppableColumn({
-  column,
-  config,
-  boardId,
-  sortedColumns,
-}: {
-  column: Column;
-  config: ColConfig;
-  boardId: string;
-  sortedColumns: Column[];
-}) {
-  const { setNodeRef, isOver } = useDroppable({
-    id: column._id,
-    data: {
-      type: "column",
-      columnId: column._id,
-    },
-  });
-
-  const sortedJobs =
-    column.jobApplications?.sort((a, b) => a.order - b.order) || [];
-  return (
-    <Card className="min-w-[300px] flex-shrink-0 shadow-md p-0">
-      <CardHeader
-        className={`${config.color} text-white rounded-t-lg pb-3 pt-3`}
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            {config.icon}
-            <CardTitle className="text-white text-base font-semibold">
-              {column.name}
-            </CardTitle>
-          </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6 text-white hover:bg-white/20"
-              >
-                <MoreVertical className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem className="text-destructive">
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete Column
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </CardHeader>
-
-      <CardContent
-        ref={setNodeRef}
-        className={`space-y-2 pt-4 bg-gray-50/50 min-h-[400px] rounded-b-lg ${
-          isOver ? "ring-2 ring-blue-500" : ""
-        }`}
-      >
-        <SortableContext
-          items={sortedJobs.map((job) => job._id)}
-          strategy={verticalListSortingStrategy}
-        >
-          {sortedJobs.map((job, key) => (
-            <SortableJobCard
-              key={key}
-              job={{ ...job, columnId: job.columnId || column._id }}
-              columns={sortedColumns}
-            />
-          ))}
-        </SortableContext>
-
-        <CreateJobApplicationDialog columnId={column._id} boardId={boardId} />
-      </CardContent>
-    </Card>
-  );
-}
-
-function SortableJobCard({
-  job,
-  columns,
-}: {
-  job: JobApplication;
+type Board = {
+  _id: string;
+  name: string;
   columns: Column[];
-}) {
-  const {
-    attributes,
-    listeners,
-    transform,
-    transition,
-    isDragging,
-    setNodeRef,
-  } = useSortable({
-    id: job._id,
-    data: {
-      type: "job",
-      job,
-    },
-  });
+};
 
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-  };
-  return (
-    <div ref={setNodeRef} style={style}>
-      <JobApplicationCard
-        job={job}
-        columns={columns}
-        dragHandleProps={{ ...attributes, ...listeners }}
-      />
-    </div>
-  );
+type Props = {
+  board: Board;
+  onRefresh?: () => void;
+};
+
+function formatDueDate(dueDate: string | Date) {
+  try {
+    if (typeof dueDate === "string") return dueDate;
+    return new Date(dueDate).toISOString().slice(0, 10);
+  } catch {
+    return String(dueDate);
+  }
 }
 
-export default function KanbanBoard({ board, userId }: KanbanBoardProps) {
-  const [activeId, setActiveId] = useState<string | null>(null);
-  const { columns, moveJob } = useBoard(board);
+export default function KanbanBoard({ board, onRefresh }: Props) {
+  const [busyId, setBusyId] = React.useState<string | null>(null);
 
-  const sortedColumns = columns?.sort((a, b) => a.order - b.order) || [];
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8,
-      },
-    })
-  );
-
-  async function handleDragStart(event: DragStartEvent) {
-    setActiveId(event.active.id as string);
+  async function onDelete(taskId: string) {
+    setBusyId(taskId);
+    try {
+      await deleteTask(taskId);
+      onRefresh?.();
+    } catch (e) {
+      console.error(e);
+      alert(e instanceof Error ? e.message : "Failed to delete");
+    } finally {
+      setBusyId(null);
+    }
   }
 
-  async function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event;
+  async function quickMove(task: Task, dir: -1 | 1) {
+    const cols = [...board.columns].sort((a, b) => a.order - b.order);
+    const currentIndex = cols.findIndex((c) => c._id === task.columnId);
+    const next = cols[currentIndex + dir];
+    if (!next) return;
 
-    setActiveId(null);
+    setBusyId(task._id);
+    try {
+      // Your updateTask expects: updateTask(taskId, { columnId, order })
+      // order is index in column; backend stores idx*100
+      await updateTask(task._id, {
+        columnId: next._id,
+        order: 0,
+      });
 
-    if (!over || !board._id) return;
-
-    const activeId = active.id as string;
-    const overId = over.id as string;
-
-    let draggedJob: JobApplication | null = null;
-    let sourceColumn: Column | null = null;
-    let sourceIndex = -1;
-
-    for (const column of sortedColumns) {
-      const jobs =
-        column.jobApplications.sort((a, b) => a.order - b.order) || [];
-      const jobIndex = jobs.findIndex((j) => j._id === activeId);
-      if (jobIndex !== -1) {
-        draggedJob = jobs[jobIndex];
-        sourceColumn = column;
-        sourceIndex = jobIndex;
-        break;
-      }
+      onRefresh?.();
+    } catch (e) {
+      console.error(e);
+      alert(e instanceof Error ? e.message : "Failed to move");
+    } finally {
+      setBusyId(null);
     }
-
-    if (!draggedJob || !sourceColumn) return;
-
-    // Check if dropped in a column or another job
-    const targetColumn = sortedColumns.find((col) => col._id === overId);
-    const targetJob = sortedColumns
-      .flatMap((col) => col.jobApplications || [])
-      .find((job) => job._id === overId);
-
-    let targetColumnId: string;
-    let newOrder: number;
-
-    if (targetColumn) {
-      targetColumnId = targetColumn._id;
-      const jobsInTarget =
-        targetColumn.jobApplications
-          .filter((j) => j._id !== activeId)
-          .sort((a, b) => a.order - b.order) || [];
-      newOrder = jobsInTarget.length;
-    } else if (targetJob) {
-      const targetJobColumn = sortedColumns.find((col) =>
-        col.jobApplications.some((j) => j._id === targetJob._id)
-      );
-      targetColumnId = targetJob.columnId || targetJobColumn?._id || "";
-      if (!targetColumnId) return;
-
-      const targetColumnObj = sortedColumns.find(
-        (col) => col._id === targetColumnId
-      );
-
-      if (!targetColumnObj) return;
-
-      const allJobsInTargetOriginal =
-        targetColumnObj.jobApplications.sort((a, b) => a.order - b.order) || [];
-
-      const allJobsInTargetFiltered =
-        allJobsInTargetOriginal.filter((j) => j._id !== activeId) || [];
-
-      const targetIndexInOriginal = allJobsInTargetOriginal.findIndex(
-        (j) => j._id === overId
-      );
-
-      const targetIndexInFiltered = allJobsInTargetFiltered.findIndex(
-        (j) => j._id === overId
-      );
-
-      if (targetIndexInFiltered !== -1) {
-        if (sourceColumn._id === targetColumnId) {
-          if (sourceIndex < targetIndexInOriginal) {
-            newOrder = targetIndexInFiltered + 1;
-          } else {
-            newOrder = targetIndexInFiltered;
-          }
-        } else {
-          newOrder = targetIndexInFiltered;
-        }
-      } else {
-        newOrder = allJobsInTargetFiltered.length;
-      }
-    } else {
-      return;
-    }
-
-    if (!targetColumnId) {
-      return;
-    }
-
-    await moveJob(activeId, targetColumnId, newOrder);
   }
 
-  const activeJob = sortedColumns
-    .flatMap((col) => col.jobApplications || [])
-    .find((job) => job._id === activeId);
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCorners}
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
-    >
-      <div className="space-y-4">
-        <div className="flex gap-4 overflow-x-auto pb-4">
-          {sortedColumns.map((col, key) => {
-            const config = COLUMN_CONFIG[key] || {
-              color: "bg-gray-500",
-              icon: <Calendar className="h-4 w-4" />,
-            };
-            return (
-              <DroppableColumn
-                key={key}
-                column={col}
-                config={config}
-                boardId={board._id}
-                sortedColumns={sortedColumns}
-              />
-            );
-          })}
-        </div>
+    <div className="w-full">
+      <div className="mb-4 flex items-center justify-between">
+        <div className="text-xl font-semibold">{board.name}</div>
       </div>
 
-      <DragOverlay>
-        {activeJob ? (
-          <div className="opacity-50">
-            <JobApplicationCard job={activeJob} columns={sortedColumns} />
-          </div>
-        ) : null}
-      </DragOverlay>
-    </DndContext>
+      <div className="flex gap-4 overflow-x-auto pb-4">
+        {board.columns
+          .slice()
+          .sort((a, b) => a.order - b.order)
+          .map((col) => (
+            <div key={col._id} className="min-w-[320px] max-w-[360px] flex-1">
+              <div className="mb-2 flex items-center justify-between">
+                <div className="text-sm font-semibold text-gray-800">
+                  {col.name}{" "}
+                  <span className="ml-1 text-xs font-normal text-gray-500">
+                    ({col.tasks?.length ?? 0})
+                  </span>
+                </div>
+
+                <CreateJobDialog
+                  boardId={board._id}
+                  columnId={col._id}
+                  onCreated={onRefresh}
+                  triggerLabel="+ Task"
+                />
+              </div>
+
+              <div className="space-y-3 rounded-lg bg-gray-50 p-3 border">
+                {(col.tasks ?? [])
+                  .slice()
+                  .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+                  .map((task) => (
+                    <Card key={task._id} className="shadow-sm">
+                      <CardContent className="p-3 space-y-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="font-medium leading-snug truncate">
+                              {task.title}
+                            </div>
+                            {task.subtitle ? (
+                              <div className="text-xs text-gray-600 truncate">
+                                {task.subtitle}
+                              </div>
+                            ) : null}
+                          </div>
+
+                          <Button
+                            variant="ghost"
+                            type="button"
+                            className="h-8 px-2"
+                            onClick={() => onDelete(task._id)}
+                            disabled={busyId === task._id}
+                            title="Delete"
+                          >
+                            ✕
+                          </Button>
+                        </div>
+
+                        {task.labels?.length ? (
+                          <div className="flex flex-wrap gap-1">
+                            {task.labels.map((l) => (
+                              <span
+                                key={l}
+                                className="rounded-full border bg-white px-2 py-[2px] text-[11px] text-gray-700"
+                              >
+                                {l}
+                              </span>
+                            ))}
+                          </div>
+                        ) : null}
+
+                        <div className="flex items-center justify-between text-xs text-gray-600">
+                          <div className="flex items-center gap-2">
+                            {task.priority ? (
+                              <span className="rounded-md border bg-white px-2 py-1">
+                                {task.priority}
+                              </span>
+                            ) : null}
+
+                            {task.dueDate ? (
+                              <span className="rounded-md border bg-white px-2 py-1">
+                                due {formatDueDate(task.dueDate)}
+                              </span>
+                            ) : null}
+
+                            {task.link ? (
+                              <a
+                                href={task.link}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="underline"
+                              >
+                                link
+                              </a>
+                            ) : null}
+                          </div>
+
+                          <div className="flex gap-1">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              className="h-8 px-2"
+                              onClick={() => quickMove(task, -1)}
+                              disabled={busyId === task._id}
+                              title="Move left"
+                            >
+                              ←
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              className="h-8 px-2"
+                              onClick={() => quickMove(task, 1)}
+                              disabled={busyId === task._id}
+                              title="Move right"
+                            >
+                              →
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+
+                {(!col.tasks || col.tasks.length === 0) && (
+                  <div className="text-xs text-gray-500 py-6 text-center">
+                    No tasks yet
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+      </div>
+    </div>
   );
 }
