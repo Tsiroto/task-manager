@@ -9,8 +9,6 @@ export interface IColumn extends Document {
   updatedAt: Date;
 }
 
-// Board -> Columns -> Tasks
-
 const ColumnSchema = new Schema<IColumn>(
   {
     name: { type: String, required: true },

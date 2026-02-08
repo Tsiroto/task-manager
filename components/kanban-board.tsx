@@ -70,8 +70,6 @@ export default function KanbanBoard({ board, onRefresh }: Props) {
 
     setBusyId(task._id);
     try {
-      // Your updateTask expects: updateTask(taskId, { columnId, order })
-      // order is index in column; backend stores idx*100
       await updateTask(task._id, {
         columnId: next._id,
         order: 0,
@@ -97,7 +95,7 @@ export default function KanbanBoard({ board, onRefresh }: Props) {
           .slice()
           .sort((a, b) => a.order - b.order)
           .map((col) => (
-            <div key={col._id} className="min-w-[320px] max-w-[360px] flex-1">
+            <div key={col._id} className="min-w-[320px] max-w-90 flex-1">
               <div className="mb-2 flex items-center justify-between">
                 <div className="text-sm font-semibold text-gray-800">
                   {col.name}{" "}
@@ -150,7 +148,7 @@ export default function KanbanBoard({ board, onRefresh }: Props) {
                             {task.labels.map((l) => (
                               <span
                                 key={l}
-                                className="rounded-full border bg-white px-2 py-[2px] text-[11px] text-gray-700"
+                                className="rounded-full border bg-white px-2 py-0.5 text-[11px] text-gray-700"
                               >
                                 {l}
                               </span>
